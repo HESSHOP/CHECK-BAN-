@@ -3,7 +3,6 @@
   "appName": "HES CHECK",
   "webDir": "www",
   "server": {
-    "url": "https://check-hes.vercel.app/",
     "androidScheme": "https",
     "cleartext": false,
     "allowNavigation": [
