@@ -168,7 +168,6 @@ jobs:
                 }
               }, "HesClip");
               injectClip(wv);
-              showFollowGate();
             }
 
             /* Branche Capacitor.Plugins.Clipboard (utilise par le site) sur la lecture native, tant que la page check-hes est affichee */
@@ -176,8 +175,7 @@ jobs:
 
             private void injectClip(final WebView wv) {
               try {
-                String u = wv.getUrl();
-                if (u != null && u.startsWith("https://check-hes.vercel.app")) {
+                {
                   wv.evaluateJavascript("(function(){try{window.Capacitor=window.Capacitor||{};var P=window.Capacitor.Plugins=window.Capacitor.Plugins||{};if(!P.Clipboard||!P.Clipboard.__hes){P.Clipboard={__hes:1,read:function(){return Promise.resolve({value:window.HesClip?window.HesClip.read():''})}}}}catch(e){}})();", null);
                 }
               } catch (Exception e) {
@@ -187,7 +185,7 @@ jobs:
                 public void run() {
                   injectClip(wv);
                 }
-              }, 1000);
+              }, 400);
             }
 
             /* Premier lancement : fenetre bloquante, bouton S'abonner au style "Ajouter maintenant" (en plus petit) */
