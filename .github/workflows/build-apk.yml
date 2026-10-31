@@ -40,6 +40,8 @@ jobs:
           import android.app.AlertDialog;
           import android.app.DownloadManager;
           import android.content.DialogInterface;
+          import android.content.ClipData;
+          import android.content.ClipboardManager;
           import android.content.Intent;
           import android.content.SharedPreferences;
           import android.graphics.Color;
@@ -55,6 +57,11 @@ jobs:
           import android.view.ViewGroup;
           import android.webkit.CookieManager;
           import android.webkit.DownloadListener;
+          import android.webkit.JavascriptInterface;
+          import android.os.Handler;
+          import android.os.Looper;
+          import java.util.concurrent.CountDownLatch;
+          import java.util.concurrent.TimeUnit;
           import android.webkit.URLUtil;
           import android.webkit.WebChromeClient;
           import android.webkit.WebResourceRequest;
@@ -128,7 +135,59 @@ jobs:
                   }
                 }
               });
+              /* Autofill : lecture native du presse-papiers, reservee au site check-hes */
+              wv.addJavascriptInterface(new Object() {
+                @JavascriptInterface
+                public String read() {
+                  final String[] res = { "" };
+                  final CountDownLatch l = new CountDownLatch(1);
+                  runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                      try {
+                        String u = wv.getUrl();
+                        if (u != null && u.startsWith("https://check-hes.vercel.app")) {
+                          ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                          if (cm != null && cm.hasPrimaryClip() && cm.getPrimaryClip() != null && cm.getPrimaryClip().getItemCount() > 0) {
+                            CharSequence c = cm.getPrimaryClip().getItemAt(0).coerceToText(MainActivity.this);
+                            if (c != null) {
+                              res[0] = c.toString();
+                            }
+                          }
+                        }
+                      } catch (Exception e) {
+                      }
+                      l.countDown();
+                    }
+                  });
+                  try {
+                    l.await(2, TimeUnit.SECONDS);
+                  } catch (Exception e) {
+                  }
+                  return res[0];
+                }
+              }, "HesClip");
+              injectClip(wv);
               showFollowGate();
+            }
+
+            /* Branche Capacitor.Plugins.Clipboard (utilise par le site) sur la lecture native, tant que la page check-hes est affichee */
+            private final Handler hnd = new Handler(Looper.getMainLooper());
+
+            private void injectClip(final WebView wv) {
+              try {
+                String u = wv.getUrl();
+                if (u != null && u.startsWith("https://check-hes.vercel.app")) {
+                  wv.evaluateJavascript("(function(){try{window.Capacitor=window.Capacitor||{};var P=window.Capacitor.Plugins=window.Capacitor.Plugins||{};if(!P.Clipboard||!P.Clipboard.__hes){P.Clipboard={__hes:1,read:function(){return Promise.resolve({value:window.HesClip?window.HesClip.read():''})}}}}catch(e){}})();", null);
+                }
+              } catch (Exception e) {
+              }
+              hnd.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                  injectClip(wv);
+                }
+              }, 1000);
             }
 
             /* Premier lancement : fenetre bloquante, bouton S'abonner au style "Ajouter maintenant" (en plus petit) */
