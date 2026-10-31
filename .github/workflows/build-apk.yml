@@ -43,6 +43,9 @@ jobs:
           import android.content.Intent;
           import android.content.SharedPreferences;
           import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.graphics.drawable.ColorDrawable;
+          import android.graphics.drawable.GradientDrawable;
           import android.net.Uri;
           import android.os.Bundle;
           import android.os.Environment;
@@ -59,6 +62,7 @@ jobs:
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
           import android.widget.FrameLayout;
+          import android.widget.LinearLayout;
           import android.widget.TextView;
           import android.widget.Toast;
           import androidx.activity.OnBackPressedCallback;
@@ -127,26 +131,67 @@ jobs:
               showFollowGate();
             }
 
-            /* Premier lancement : message bloquant, il disparait seulement apres un clic sur le bouton */
+            /* Premier lancement : fenetre bloquante, bouton S'abonner au style "Ajouter maintenant" (en plus petit) */
             private void showFollowGate() {
               final SharedPreferences sp = getSharedPreferences("hes_prefs", MODE_PRIVATE);
               if (sp.getBoolean("wa_follow", false)) {
                 return;
               }
-              AlertDialog dlg = new AlertDialog.Builder(this)
-                .setTitle("Abonne-toi \u00e0 la cha\u00eene WhatsApp")
-                .setMessage("Avant de continuer, abonne-toi \u00e0 notre cha\u00eene WhatsApp. Appuie sur le bouton ci-dessous pour continuer.")
-                .setCancelable(false)
-                .setPositiveButton("S\u2019abonner", new DialogInterface.OnClickListener() {
-                  @Override
-                  public void onClick(DialogInterface dialog, int which) {
-                    sp.edit().putBoolean("wa_follow", true).apply();
-                    openExternal(CHANNEL_URL);
+              float d = getResources().getDisplayMetrics().density;
+              LinearLayout box = new LinearLayout(this);
+              box.setOrientation(LinearLayout.VERTICAL);
+              int pad = (int) (24 * d);
+              box.setPadding(pad, (int) (28 * d), pad, (int) (24 * d));
+              GradientDrawable bg = new GradientDrawable();
+              bg.setColor(0xFF0B0D1F);
+              bg.setCornerRadius(20 * d);
+              box.setBackground(bg);
+              TextView t = new TextView(this);
+              t.setText("Abonne-toi \u00e0 la cha\u00eene WhatsApp");
+              t.setTextColor(Color.WHITE);
+              t.setTextSize(20);
+              t.setTypeface(Typeface.DEFAULT_BOLD);
+              t.setGravity(Gravity.CENTER);
+              box.addView(t, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+              TextView m = new TextView(this);
+              m.setText("Avant de continuer, abonne-toi \u00e0 notre cha\u00eene WhatsApp, puis appuie sur le bouton.");
+              m.setTextColor(0xFFB8BCD0);
+              m.setTextSize(15);
+              m.setGravity(Gravity.CENTER);
+              LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+              mp.topMargin = (int) (12 * d);
+              box.addView(m, mp);
+              final AlertDialog[] holder = new AlertDialog[1];
+              TextView b = new TextView(this);
+              b.setText("S\u2019abonner");
+              b.setTextColor(0xFF07140F);
+              b.setTextSize(16);
+              b.setTypeface(Typeface.DEFAULT_BOLD);
+              b.setGravity(Gravity.CENTER);
+              GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[] { 0xFF1B7F8C, 0xFF2FAE5B });
+              g.setCornerRadius(10 * d);
+              b.setBackground(g);
+              b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                  sp.edit().putBoolean("wa_follow", true).apply();
+                  openExternal(CHANNEL_URL);
+                  if (holder[0] != null) {
+                    holder[0].dismiss();
                   }
-                })
-                .create();
+                }
+              });
+              LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams((int) (200 * d), (int) (44 * d));
+              bp.topMargin = (int) (22 * d);
+              bp.gravity = Gravity.CENTER_HORIZONTAL;
+              box.addView(b, bp);
+              AlertDialog dlg = new AlertDialog.Builder(this).setView(box).setCancelable(false).create();
+              holder[0] = dlg;
               dlg.setCanceledOnTouchOutside(false);
               dlg.show();
+              if (dlg.getWindow() != null) {
+                dlg.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+              }
             }
 
             private WebView openPopup() {
@@ -163,7 +208,7 @@ jobs:
                   if (u.startsWith("http://") || u.startsWith("https://")) {
                     return false;
                   }
-                  openExternal(u);
+                  openNative(u);
                   return true;
                 }
               });
@@ -227,7 +272,41 @@ jobs:
                 .show();
             }
 
+            /* Ouvre un lien : web = dans l'appli (fenetre interne), whatsapp/tg/autres = appli native */
             void openExternal(String url) {
+              try {
+                if (url.startsWith("http://") || url.startsWith("https://")) {
+                  if (url.contains("whatsapp.com") || url.contains("wa.me")) {
+                    openWhatsApp(url);
+                    return;
+                  }
+                  if (url.contains("t.me/")) {
+                    openNative(url);
+                    return;
+                  }
+                  WebView pw = openPopup();
+                  pw.loadUrl(url);
+                  return;
+                }
+                openNative(url);
+              } catch (Exception e) {
+              }
+            }
+
+            /* WhatsApp : ouvre directement dans l'appli, Android propose WhatsApp / WhatsApp Business si les deux sont installes */
+            void openWhatsApp(String url) {
+              try {
+                Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                Intent c = Intent.createChooser(i, "Ouvrir avec");
+                c.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(c);
+              } catch (Exception e) {
+                openNative(url);
+              }
+            }
+
+            void openNative(String url) {
               try {
                 Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
                 i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
