@@ -16,7 +16,7 @@
 <a class="b" href="https://t.me/HESSS_SUPPORT">HE’S HELP</a></div>
 <script>
 /* retour automatique au site dès que la connexion revient */
-var SITE="https://check-hes.vercel.app/",busy=false;
+var SITE="index.html",busy=false;
 function go(){if(busy)return;busy=true;
  fetch(SITE+"?_="+Date.now(),{method:"HEAD",mode:"no-cors",cache:"no-store"}).then(function(){location.href=SITE},function(){busy=false})}
 window.addEventListener("online",go);
