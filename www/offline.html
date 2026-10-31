@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>H’ES CHECK · Problème de connexion</title>
+<style>html,body{margin:0;height:100%;background:#fff}
+.pg{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;text-align:center;font-family:Arvo,Rockwell,"Roboto Slab",Georgia,serif;color:#2f2f2f}
+.pg h1{margin:0;font-weight:400;font-size:clamp(64px,20vw,110px);line-height:1}
+.pg img{width:min(94vw,600px);height:auto;aspect-ratio:385/198;display:block;margin:4px 0 10px}
+.pg h2{margin:0 0 26px;font-weight:400;font-size:clamp(22px,6vw,30px)}
+.b{display:inline-block;background:#39b030;color:#fff;text-decoration:none;padding:16px 40px;font-size:17px;-webkit-tap-highlight-color:transparent}
+.b:active{background:#2e9627}</style></head>
+<body>
+<div class="pg"><h1>404</h1>
+<img alt="" src="offline.webp">
+<h2>Problème de connexion</h2>
+<a class="b" href="https://t.me/HESSS_SUPPORT">HE’S HELP</a></div>
+<script>
+/* retour automatique au site dès que la connexion revient */
+var SITE="https://check-hes.vercel.app/",busy=false;
+function go(){if(busy)return;busy=true;
+ fetch(SITE+"?_="+Date.now(),{method:"HEAD",mode:"no-cors",cache:"no-store"}).then(function(){location.href=SITE},function(){busy=false})}
+window.addEventListener("online",go);
+setInterval(go,4000);
+</script></body></html>
