@@ -1,0 +1,260 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Installer les dépendances
+        run: npm install
+
+      - name: Créer le projet Android
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: Fenêtres du lecteur dans l'appli + confirmation de sortie
+        run: |
+          mkdir -p android/app/src/main/java/com/hescheck/app
+          cat > android/app/src/main/java/com/hescheck/app/MainActivity.java <<'EOF'
+          package com.hescheck.app;
+
+          import android.app.AlertDialog;
+          import android.app.DownloadManager;
+          import android.content.DialogInterface;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.graphics.Color;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import android.os.Environment;
+          import android.os.Message;
+          import android.view.Gravity;
+          import android.view.View;
+          import android.view.ViewGroup;
+          import android.webkit.CookieManager;
+          import android.webkit.DownloadListener;
+          import android.webkit.URLUtil;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebResourceRequest;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import android.widget.FrameLayout;
+          import android.widget.TextView;
+          import android.widget.Toast;
+          import androidx.activity.OnBackPressedCallback;
+          import com.getcapacitor.BridgeActivity;
+          import com.getcapacitor.BridgeWebChromeClient;
+
+          public class MainActivity extends BridgeActivity {
+            private static final String CHANNEL_URL = "https://whatsapp.com/channel/0029Vb7Ibg5002T79MWH2r1p";
+            private FrameLayout layer;
+            private WebView popup;
+
+            @Override
+            protected void onCreate(Bundle savedInstanceState) {
+              super.onCreate(savedInstanceState);
+              final WebView wv = getBridge().getWebView();
+              WebSettings s = wv.getSettings();
+              s.setSupportMultipleWindows(true);
+              s.setJavaScriptCanOpenWindowsAutomatically(true);
+              wv.setWebChromeClient(new BridgeWebChromeClient(getBridge()) {
+                @Override
+                public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
+                  WebView pw = openPopup();
+                  WebView.WebViewTransport t = (WebView.WebViewTransport) resultMsg.obj;
+                  t.setWebView(pw);
+                  resultMsg.sendToTarget();
+                  return true;
+                }
+              });
+              wv.setDownloadListener(new DownloadListener() {
+                @Override
+                public void onDownloadStart(String url, String userAgent, String contentDisposition, String mimetype, long contentLength) {
+                  try {
+                    DownloadManager.Request r = new DownloadManager.Request(Uri.parse(url));
+                    if (mimetype != null) {
+                      r.setMimeType(mimetype);
+                    }
+                    String cookies = CookieManager.getInstance().getCookie(url);
+                    if (cookies != null) {
+                      r.addRequestHeader("cookie", cookies);
+                    }
+                    if (userAgent != null) {
+                      r.addRequestHeader("User-Agent", userAgent);
+                    }
+                    r.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                    r.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, URLUtil.guessFileName(url, contentDisposition, mimetype));
+                    DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+                    dm.enqueue(r);
+                    Toast.makeText(MainActivity.this, "T\u00e9l\u00e9chargement d\u00e9marr\u00e9\u2026", Toast.LENGTH_SHORT).show();
+                  } catch (Exception e) {
+                    openExternal(url);
+                  }
+                }
+              });
+              getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+                @Override
+                public void handleOnBackPressed() {
+                  if (popup != null) {
+                    closePopup();
+                  } else if (wv.canGoBack()) {
+                    wv.goBack();
+                  } else {
+                    confirmExit();
+                  }
+                }
+              });
+              showFollowGate();
+            }
+
+            /* Premier lancement : message bloquant, il disparait seulement apres un clic sur le bouton */
+            private void showFollowGate() {
+              final SharedPreferences sp = getSharedPreferences("hes_prefs", MODE_PRIVATE);
+              if (sp.getBoolean("wa_follow", false)) {
+                return;
+              }
+              AlertDialog dlg = new AlertDialog.Builder(this)
+                .setTitle("Abonne-toi \u00e0 la cha\u00eene WhatsApp")
+                .setMessage("Avant de continuer, abonne-toi \u00e0 notre cha\u00eene WhatsApp. Appuie sur le bouton ci-dessous pour continuer.")
+                .setCancelable(false)
+                .setPositiveButton("S\u2019abonner", new DialogInterface.OnClickListener() {
+                  @Override
+                  public void onClick(DialogInterface dialog, int which) {
+                    sp.edit().putBoolean("wa_follow", true).apply();
+                    openExternal(CHANNEL_URL);
+                  }
+                })
+                .create();
+              dlg.setCanceledOnTouchOutside(false);
+              dlg.show();
+            }
+
+            private WebView openPopup() {
+              closePopup();
+              float d = getResources().getDisplayMetrics().density;
+              popup = new WebView(this);
+              WebSettings ps = popup.getSettings();
+              ps.setJavaScriptEnabled(true);
+              ps.setDomStorageEnabled(true);
+              popup.setWebViewClient(new WebViewClient() {
+                @Override
+                public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
+                  String u = r.getUrl().toString();
+                  if (u.startsWith("http://") || u.startsWith("https://")) {
+                    return false;
+                  }
+                  openExternal(u);
+                  return true;
+                }
+              });
+              popup.setWebChromeClient(new WebChromeClient() {
+                @Override
+                public void onCloseWindow(WebView w) {
+                  closePopup();
+                }
+              });
+              layer = new FrameLayout(this);
+              layer.setBackgroundColor(Color.BLACK);
+              layer.setClickable(true);
+              layer.addView(popup, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+              TextView x = new TextView(this);
+              x.setText("\u2715");
+              x.setTextColor(Color.WHITE);
+              x.setTextSize(22);
+              x.setGravity(Gravity.CENTER);
+              x.setBackgroundColor(0x99000000);
+              x.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                  closePopup();
+                }
+              });
+              int size = (int) (44 * d);
+              FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(size, size, Gravity.TOP | Gravity.END);
+              lp.setMargins(0, (int) (12 * d), (int) (12 * d), 0);
+              layer.addView(x, lp);
+              addContentView(layer, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+              return popup;
+            }
+
+            private void closePopup() {
+              if (layer != null) {
+                layer.removeAllViews();
+                ViewGroup p = (ViewGroup) layer.getParent();
+                if (p != null) {
+                  p.removeView(layer);
+                }
+                layer = null;
+              }
+              if (popup != null) {
+                popup.stopLoading();
+                popup.destroy();
+                popup = null;
+              }
+            }
+
+            private void confirmExit() {
+              new AlertDialog.Builder(this)
+                .setTitle("Quitter H\u2019ES CHECK ?")
+                .setMessage("Veux-tu vraiment fermer l'application ?")
+                .setNegativeButton("Rester", null)
+                .setPositiveButton("Quitter", new DialogInterface.OnClickListener() {
+                  @Override
+                  public void onClick(DialogInterface dialog, int which) {
+                    finish();
+                  }
+                })
+                .show();
+            }
+
+            void openExternal(String url) {
+              try {
+                Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(i);
+              } catch (Exception e) {
+              }
+            }
+          }
+          EOF
+
+      - name: Compiler l'APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Renommer l'APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk HESCHECK.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HESCHECK-apk
+          path: HESCHECK.apk
+
+      - name: Publier dans Releases (lien de téléchargement direct)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest HESCHECK.apk --title "HES CHECK APK" --notes "Dernière version de l'APK"
