@@ -3,13 +3,7 @@
   "appName": "HES CHECK",
   "webDir": "www",
   "server": {
-    "androidScheme": "https",
-    "cleartext": false,
-    "allowNavigation": [
-      "check-hes.vercel.app",
-      "he-s-shop-v2.skyhost.tech"
-    ],
-    "errorPath": "offline.html"
+    "androidScheme": "https"
   },
   "backgroundColor": "#000000"
 }

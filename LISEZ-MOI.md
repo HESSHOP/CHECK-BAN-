@@ -1,19 +1,22 @@
-# HES CHECK : APK
+# HES CHECK : APK (site inclus dans l'appli)
 
-Même méthode que HES STORE : l'appli ouvre https://check-hes.vercel.app/ (rien à reconstruire quand tu modifies le site).
+```
+hescheck-apk/
+├─ www/
+│  ├─ index.html        ← route « / » : le site Check Ban complet (c'est ici qu'on le modifie)
+│  ├─ offline.html      ← page « Problème de connexion » (+ offline.webp)
+├─ capacitor.config.json  (appId com.hescheck.app · nom HES CHECK · webDir = www)
+├─ package.json
+└─ .github/workflows/build-apk.yml   (compile HESCHECK.apk)
+```
 
-1. Crée un dépôt GitHub et envoie tout ce dossier (y compris `.github`).
-2. Onglet **Actions** → **Build APK** → **Run workflow** (se lance aussi à chaque push).
-3. Une fois fini (~5 min), télécharge `HESCHECK.apk` dans **Releases** (lien direct) ou dans les artefacts de l'exécution.
+- L'appli ouvre `www/index.html` : le site est dans l'APK. Pour le changer, remplace `www/index.html` puis relance le build.
+- Les vérifications appellent `https://he-s-shop-v2.skyhost.tech/api/checkban` (constante `API` en haut du script de `www/index.html`).
+- Pour d'autres pages, ajoute-les dans `www/` (ex. `www/aide.html` → lien `aide.html`).
+- Variante en ligne (le site se met à jour sans rebuild) : dans `capacitor.config.json`, remplace `"server"` par
+  `{"url":"https://check-hes.vercel.app/","androidScheme":"https","allowNavigation":["check-hes.vercel.app","he-s-shop-v2.skyhost.tech"],"errorPath":"offline.html"}`.
 
-Inclus, comme HES STORE : page « Problème de connexion » avec retour automatique, fenêtres du site ouvertes dans l'appli, téléchargements, confirmation en quittant, message WhatsApp au premier lancement.
-Plus : le plugin presse-papiers Capacitor, pour que **Autofill** colle le pseudo sans blocage.
-
-## Intro vidéo
-L'appli joue d'abord `www/hescheck-intro.mp4` (bouton « Passer »), puis ouvre https://check-hes.vercel.app/. Pour cela, `server.url` a été retiré de `capacitor.config.json` : `www/index.html` se lance en premier.
-
-## Bouton S'abonner
-Au premier lancement, la fenêtre « Abonne-toi à la chaîne WhatsApp » a un bouton **S'abonner** au style de « Ajouter maintenant » (dégradé bleu-vert → vert, texte sombre gras), en plus petit (200 × 44 dp). Modifié dans `.github/workflows/build-apk.yml` (méthode `showFollowGate`).
-
-## Liens
-Les liens web s'ouvrent dans l'appli (fenêtre interne avec ✕), sans montrer le navigateur. Les liens WhatsApp (chaîne, wa.me) ouvrent directement l'appli WhatsApp : si WhatsApp et WhatsApp Business sont installés, Android propose de choisir. Les liens Telegram ouvrent l'appli Telegram.
+## Compiler
+1. Envoie tout ce dossier sur GitHub (avec `.github`).
+2. Actions → Build APK → Run workflow.
+3. Télécharge `HESCHECK.apk` dans Releases.
